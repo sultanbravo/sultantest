@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Проверка контрагентов по ИНН</title>
+    <style>
+        /* Стили остаются такими же как в предыдущем коде */
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --light-color: #ecf0f1;
+            --dark-color: #34495e;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: var(--dark-color);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* ... остальные стили ... */
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <div class="logo">Контрагент-Проверка</div>
+            <nav>
+                <ul>
+                    <li><a href="#">Главная</a></li>
+                    <li><a href="#">О сервисе</a></li>
+                    <li><a href="#">Тарифы</a></li>
+                    <li><a href="#">Контакты</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    
+    <section class="hero">
+        <div class="container">
+            <h1>Проверка благонадежности контрагентов</h1>
+            <p>Быстрая и надежная проверка компаний по ИНН. Получите полную информацию о контрагенте за несколько секунд.</p>
+        </div>
+    </section>
+    
+    <div class="container">
+        <section class="search-section">
+            <form class="search-form" id="innForm">
+                <div class="form-group">
+                    <label for="inn">Введите ИНН контрагента</label>
+                    <div class="input-group">
+                        <input type="text" id="inn" placeholder="10 или 12 цифр" maxlength="12">
+                        <button type="submit">Проверить</button>
+                    </div>
+                    <div class="validation-error" id="innError">Пожалуйста, введите корректный ИНН (10 или 12 цифр)</div>
+                </div>
+                <div class="api-selector">
+                    <label>Источник данных:</label>
+                    <select id="apiSource">
+                        <option value="dadata">DaData (демо)</option>
+                        <option value="fns">ФНС API</option>
+                        <option value="kontur">Контур.Фокус</option>
+                    </select>
+                </div>
+            </form>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Идет проверка контрагента...</p>
+            </div>
+        </section>
+        
+        <section class="results-section" id="results">
+            <!-- Результаты будут заполняться динамически -->
+        </section>
+        
+        <section class="features">
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Мгновенная проверка</h3>
+                <p>Получите полный отчет о компании за несколько секунд</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Подробная аналитика</h3>
+                <p>Оценка рисков и финансовых показателей компании</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Надежные данные</h3>
+                <p>Информация из официальных государственных источников</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>Доступ с любого устройства</h3>
+                <p>Удобный интерфейс для компьютеров и мобильных устройств</p>
+            </div>
+        </section>
+    </div>
+    
+    <footer>
+        <div class="container footer-content">
+            <div class="logo">Контрагент-Проверка</div>
+            <div class="footer-links">
+                <a href="#">Политика конфиденциальности</a>
+                <a href="#">Пользовательское соглашение</a>
+                <a href="#">Поддержка</a>
+            </div>
+            <p>© 2023 Контрагент-Проверка. Все права защищены.</p>
+        </div>
+    </footer>
+    
+    <script>
+        // Конфигурация API
+        const API_CONFIG = {
+            dadata: {
+                url: 'https://suggestions.dadata.ru/suggestions/api/4_1/rs/findById/party',
+                token: 'YOUR_DADATA_TOKEN' // Замените на реальный токен
+            },
+            fns: {
+                url: 'https://api-fns.ru/api/egr',
+                key: 'YOUR_FNS_KEY' // Замените на реальный ключ
+            }
+        };
+
+        document.getElementById('innForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const inn = document.getElementById('inn').value;
+            const apiSource = document.getElementById('apiSource').value;
+            const innError = document.getElementById('innError');
+            
+            // Валидация ИНН
+            if (!validateINN(inn)) {
+                innError.style.display = 'block';
+                return;
+            }
+            
+            innError.style.display = 'none';
+            
+            // Показать индикатор загрузки
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            
+            try {
+                let companyData;
+                
+                switch(apiSource) {
+                    case 'dadata':
+                        companyData = await fetchFromDaData(inn);
+                        break;
+                    case 'fns':
+                        companyData = await fetchFromFNS(inn);
+                        break;
+                    default:
+                        companyData = await fetchFromDaData(inn);
+                }
+                
+                // Скрыть индикатор загрузки
+                document.getElementById('loading').style.display = 'none';
+                
+                // Отобразить результаты
+                displayResults(companyData, inn);
+                
+            } catch (error) {
+                console.error('Ошибка при получении данных:', error);
+                document.getElementById('loading').style.display = 'none';
+                showError('Произошла ошибка при получении данных. Попробуйте еще раз.');
+            }
+        });
+        
+        function validateINN(inn) {
+            const innRegex = /^\d{10}$|^\d{12}$/;
+            return innRegex.test(inn);
+        }
+        
+        async function fetchFromDaData(inn) {
+            const response = await fetch(API_CONFIG.dadata.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Authorization': 'Token ' + API_CONFIG.dadata.token
+                },
+                body: JSON.stringify({ query: inn })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Ошибка API DaData');
+            }
+            
+            const data = await response.json();
+            
+            if (!data.suggestions || data.suggestions.length === 0) {
+                throw new Error('Компания с таким ИНН не найдена');
+            }
+            
+            return data.suggestions[0];
+        }
+        
+        async function fetchFromFNS(inn) {
+            const url = `${API_CONFIG.fns.url}?req=${inn}&key=${API_CONFIG.fns.key}`;
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error('Ошибка API ФНС');
+            }
+            
+            const data = await response.json();
+            return data;
+        }
+        
+        function displayResults(companyData, inn) {
+            const resultsSection = document.getElementById('results');
+            
+            // Определяем надежность компании на основе данных
+            const reliability = calculateReliability(companyData);
+            
+            let reliabilityBadge;
+            let reliabilityText;
+            
+            switch(reliability) {
+                case 'high':
+                    reliabilityBadge = 'reliable';
+                    reliabilityText = 'Надежный';
+                    break;
+                case 'medium':
+                    reliabilityBadge = 'medium-risk';
+                    reliabilityText = 'Средний риск';
+                    break;
+                case 'low':
+                    reliabilityBadge = 'high-risk';
+                    reliabilityText = 'Высокий риск';
+                    break;
+                default:
+                    reliabilityBadge = 'medium-risk';
+                    reliabilityText = 'Требует проверки';
+            }
+            
+            // Формируем HTML с результатами
+            resultsSection.innerHTML = `
+                <div class="results-header">
+                    <div class="company-name">${companyData.value || companyData.ИМЯ_ЮЛ}</div>
+                    <div class="reliability-badge ${reliabilityBadge}">${reliabilityText}</div>
+                </div>
+                
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h3>ИНН</h3>
+                        <p>${inn}</p>
+                    </div>
+                    <div class="info-card">
+                        <h3>ОГРН</h3>
+                        <p>${companyData.data.ogrn || companyData.ОГРН || 'Не указан'}</p>
+                    </div>
+                    <div class="info-card">
+                        <h3>Юридический адрес</h3>
+                        <p>${companyData.data.address?.value || companyData.АДРЕС || 'Не указан'}</p>
+                    </div>
+                    <div class="info-card">
+                        <h3>Руководитель</h3>
+                        <p>${companyData.data.management?.name || companyData.РУКОВОДИТЕЛЬ || 'Не указан'}</p>
+                    </div>
+                    <div class="info-card">
+                        <h3>Основной вид деятельности</h3>
+                        <p>${companyData.data.okved || companyData.ОКВЭД || 'Не указан'}</p>
+                    </div>
+                    <div class="info-card">
+                        <h3>Статус</h3>
+                        <p>${companyData.data.state?.status || companyData.СТАТУС || 'Действующая'}</p>
+                    </div>
+                </div>
+                
+                <div class="risks-section">
+                    <h2>Оценка рисков</h2>
+                    ${generateRiskAssessment(companyData, reliability)}
+                </div>
+            `;
+            
+            resultsSection.style.display = 'block';
+        }
+        
+        function calculateReliability(companyData) {
+            // Простая логика оценки надежности
+            // В реальном приложении здесь будет более сложный алгоритм
+            
+            const status = companyData.data.state?.status;
+            const registrationDate = companyData.data.state?.registration_date;
+            
+            if (status && status !== 'ACTIVE') {
+                return 'low';
+            }
+            
+            if (registrationDate) {
+                const regDate = new Date(registrationDate);
+                const yearsDiff = (new Date() - regDate) / (1000 * 60 * 60 * 24 * 365);
+                
+                if (yearsDiff > 3) return 'high';
+                if (yearsDiff > 1) return 'medium';
+            }
+            
+            return 'medium';
+        }
+        
+        function generateRiskAssessment(companyData, reliability) {
+            // Генерация оценки рисков на основе данных о компании
+            let risksHTML = '';
+            
+            if (reliability === 'high') {
+                risksHTML = `
+                    <div class="risk-item risk-low">
+                        <div class="risk-icon">✓</div>
+                        <div>Компания действует более 3 лет</div>
+                    </div>
+                    <div class="risk-item risk-low">
+                        <div class="risk-icon">✓</div>
+                        <div>Нет признаков проблем с налоговой отчетностью</div>
+                    </div>
+                `;
+            } else if (reliability === 'medium') {
+                risksHTML = `
+                    <div class="risk-item risk-low">
+                        <div class="risk-icon">✓</div>
+                        <div>Компания официально зарегистрирована</div>
+                    </div>
+                    <div class="risk-item risk-medium">
+                        <div class="risk-icon">!</div>
+                        <div>Небольшой срок деятельности компании</div>
+                    </div>
+                `;
+            } else {
+                risksHTML = `
+                    <div class="risk-item risk-high">
+                        <div class="risk-icon">⚠</div>
+                        <div>Компания имеет недействующий статус</div>
+                    </div>
+                    <div class="risk-item risk-high">
+                        <div class="risk-icon">⚠</div>
+                        <div>Высокий риск при заключении договоров</div>
+                    </div>
+                `;
+            }
+            
+            return risksHTML;
+        }
+        
+        function showError(message) {
+            const resultsSection = document.getElementById('results');
+            resultsSection.innerHTML = `
+                <div class="error-message">
+                    <h3>Ошибка</h3>
+                    <p>${message}</p>
+                </div>
+            `;
+            resultsSection.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
